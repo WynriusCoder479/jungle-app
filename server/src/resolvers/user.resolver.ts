@@ -76,6 +76,13 @@ export class UserResolver {
 	@UseMiddleware(validateMiddleware.validateLoginInput, validateMiddleware.checkLogin)
 	async login(@Arg('loginInput') _loginInput: LoginInput, @Ctx() { res, user }: Context): Promise<UserResponse> {
 		try {
+			if (user?.isBan)
+				return {
+					code: 400,
+					success: false,
+					message: `User has been banned`
+				}
+
 			jwt.sendRefreshToken(user as User, res)
 
 			return {
@@ -93,10 +100,10 @@ export class UserResolver {
 	@Mutation(_return => UserResponse)
 	@UseMiddleware(authMiddleware.verifyToken)
 	async logout(@Ctx() context: Context): Promise<UserResponse> {
-		const { userId } = context
+		const { user } = context
 
 		try {
-			const existingUser = await User.findOneBy({ userId })
+			const existingUser = await User.findOneBy({ userId: user?.userId })
 
 			if (!existingUser)
 				return {

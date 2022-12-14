@@ -19,6 +19,7 @@ import { Post } from './entities/post.entity'
 import { Tag } from './entities/tag.entity'
 import { User } from './entities/user.entity'
 import { Vote } from './entities/vote.entity'
+import { AdminResolver } from './resolvers/admin.resolver'
 import { UserResolver } from './resolvers/user.resolver'
 import { Context } from './types/context'
 
@@ -64,7 +65,7 @@ const main = async () => {
 
 	const schema = await buildSchema({
 		validate: false,
-		resolvers: [UserResolver]
+		resolvers: [UserResolver, AdminResolver]
 	})
 
 	const serverCleanup = useServer({ schema }, wsServer)

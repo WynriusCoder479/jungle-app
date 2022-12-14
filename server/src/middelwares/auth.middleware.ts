@@ -21,10 +21,6 @@ const AuthMiddleware = () => {
 
 				if (!refreshToken) return `Not authenticated to perform GraphQL operations`
 
-				const token = await TokenModel.findOne({ token: refreshToken })
-
-				if (!token) return `Invalid token`
-
 				const verifyRefreshToken = verify(refreshToken as string, process.env.REFRESH_TOKEN_SECRET as Secret) as UserAuthPayload
 
 				const existingUser = await User.findOneBy({ userId: verifyRefreshToken.userId })
@@ -33,7 +29,7 @@ const AuthMiddleware = () => {
 
 				jwt.sendRefreshToken(existingUser, res)
 
-				context.userId = existingUser.userId
+				context.user = existingUser
 
 				return next()
 			} else {
@@ -47,7 +43,7 @@ const AuthMiddleware = () => {
 
 				if (!existingUser) return `User not found, token is invalid`
 
-				context.userId = existingUser.userId
+				context.user = existingUser
 
 				return next()
 			}
@@ -56,7 +52,15 @@ const AuthMiddleware = () => {
 		}
 	}
 
-	return { verifyToken }
+	const isAdmin: MiddlewareFn<Context> = async ({ context }, next: NextFn) => {
+		const { user } = context
+
+		if (!user?.isAdmin) return `Only admin have permission to request to here resolver`
+
+		return next()
+	}
+
+	return { verifyToken, isAdmin }
 }
 
 export default AuthMiddleware()

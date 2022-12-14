@@ -14,6 +14,15 @@ abstract class IResponse {
 }
 
 @ObjectType()
+class Users {
+	@Field(_type => [User])
+	users: User[]
+
+	@Field(_type => Number)
+	nextPage: number
+}
+
+@ObjectType()
 class BaseResponse {
 	@Field(_type => String)
 	code!: number
@@ -50,4 +59,4 @@ class UserResponse implements IResponse {
 	accessToken?: Promise<string>
 }
 
-export { IResponse, UserResponse, FieldError, BaseResponse }
+export { IResponse, UserResponse, FieldError, BaseResponse, Users }
