@@ -68,6 +68,10 @@ export class User extends BaseEntity {
 	@Column('boolean', { default: false })
 	isBan: Boolean
 
+	@Field(_type => Boolean)
+	@Column('boolean', { default: false })
+	isMaster: Boolean
+
 	@Field(_type => String)
 	@Column()
 	avatarUrl: string

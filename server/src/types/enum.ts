@@ -20,4 +20,9 @@ enum VoteValue {
 	DOWN_VOTE = -1
 }
 
-export { Gender, Rank, VoteValue }
+enum BanOrUnban {
+	BAN = 'Ban',
+	UNBAN = 'Unban'
+}
+
+export { Gender, Rank, VoteValue, BanOrUnban }

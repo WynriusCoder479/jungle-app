@@ -1,9 +1,14 @@
-import { Context } from 'src/types/context'
-import { Arg, Ctx, FieldResolver, Mutation, Query, Resolver, Root, UseMiddleware } from 'type-graphql'
+import { Arg, Ctx, FieldResolver, Mutation, Query, registerEnumType, Resolver, Root, UseMiddleware } from 'type-graphql'
 import { User } from '../entities/user.entity'
 import authMiddleware from '../middelwares/auth.middleware'
+import { Context } from '../types/context'
+import { BanOrUnban } from '../types/enum'
 import { UserResponse, Users } from '../types/response'
 import { internalServerError } from '../utils/internalServerError'
+
+registerEnumType(BanOrUnban, {
+	name: 'BanOrUnbanEnum'
+})
 
 @Resolver(_of => User)
 export class AdminResolver {
@@ -42,42 +47,11 @@ export class AdminResolver {
 
 	@Mutation(_return => UserResponse)
 	@UseMiddleware(authMiddleware.verifyToken, authMiddleware.isAdmin)
-	async grantAdminPermission(@Arg('userId') userId: string): Promise<UserResponse> {
-		try {
-			const existingUser = await User.findOneBy({ userId })
-
-			if (!existingUser)
-				return {
-					code: 400,
-					success: false,
-					message: `User not found`
-				}
-
-			if (existingUser.isAdmin)
-				return {
-					code: 201,
-					success: true,
-					message: `User is a admin`
-				}
-
-			existingUser.isAdmin = true
-
-			await existingUser.save()
-
-			return {
-				code: 200,
-				success: true,
-				message: `Set user is admin successfully`,
-				user: existingUser
-			}
-		} catch (err) {
-			throw internalServerError(err)
-		}
-	}
-
-	@Mutation(_return => UserResponse)
-	@UseMiddleware(authMiddleware.verifyToken, authMiddleware.isAdmin)
-	async removeAdminPermission(@Arg('userId') userId: string, @Ctx() context: Context): Promise<UserResponse> {
+	async grantOrRemoveAdminPermission(
+		@Arg('userId') userId: string,
+		@Arg('option') option: 'grant' | 'remove',
+		@Ctx() context: Context
+	): Promise<UserResponse> {
 		const { user } = context
 
 		try {
@@ -90,21 +64,31 @@ export class AdminResolver {
 					message: `User not found`
 				}
 
-			if (!existingUser.isAdmin)
+			if (existingUser.isAdmin && option === 'grant')
 				return {
-					code: 400,
-					success: false,
-					message: `User is not admin`
+					code: 201,
+					success: true,
+					message: `User is a admin`
 				}
 
-			existingUser.isAdmin = false
+			if (!existingUser.isAdmin && option === 'remove')
+				return {
+					code: 201,
+					success: true,
+					message: `User isn't admin`
+				}
+
+			existingUser.isAdmin = option === 'grant' ? true : false
 
 			await existingUser.save()
 
 			return {
 				code: 200,
 				success: true,
-				message: `Removered admin permission of ${existingUser.username}, by admin ${user?.username}`,
+				message:
+					option === 'grant'
+						? `Set user ${existingUser.username} is admin successfully`
+						: `Removered admin permission of ${existingUser.username}, by admin ${user?.username}`,
 				user: existingUser
 			}
 		} catch (err) {
@@ -114,7 +98,7 @@ export class AdminResolver {
 
 	@Mutation(_return => UserResponse)
 	@UseMiddleware(authMiddleware.verifyToken, authMiddleware.isAdmin)
-	async banUser(@Arg('userId') userId: string): Promise<UserResponse> {
+	async banOrUnbanUser(@Arg('userId') userId: string, @Arg('option') option: 'Ban' | 'Unban'): Promise<UserResponse> {
 		try {
 			const existingUser = await User.findOneBy({ userId })
 
@@ -125,21 +109,28 @@ export class AdminResolver {
 					message: `User not found`
 				}
 
-			if (existingUser.isBan)
+			if (existingUser.isBan && option === 'Ban')
 				return {
 					code: 201,
 					success: false,
 					message: `User ${existingUser.username} was baned`
 				}
 
-			existingUser.isBan = true
+			if (!existingUser.isBan && option === 'Unban')
+				return {
+					code: 201,
+					success: false,
+					message: `User ${existingUser.username} isn't ban`
+				}
+
+			existingUser.isBan = option === 'Ban' ? true : false
 
 			await existingUser.save()
 
 			return {
 				code: 200,
-				success: false,
-				message: `Ban user ${existingUser.username} successfully`
+				success: true,
+				message: `${option} user ${existingUser.username} successfully`
 			}
 		} catch (err) {
 			throw internalServerError(err)
@@ -148,7 +139,9 @@ export class AdminResolver {
 
 	@Mutation(_return => UserResponse)
 	@UseMiddleware(authMiddleware.verifyToken, authMiddleware.isAdmin)
-	async unbanUser(@Arg('userId') userId: string): Promise<UserResponse> {
+	async removeUser(@Arg('userId') userId: string, @Ctx() context: Context): Promise<UserResponse> {
+		const { user } = context
+
 		try {
 			const existingUser = await User.findOneBy({ userId })
 
@@ -159,21 +152,29 @@ export class AdminResolver {
 					message: `User not found`
 				}
 
-			if (!existingUser.isBan)
+			if (existingUser.isAdmin && !user?.isMaster)
 				return {
-					code: 201,
+					code: 400,
 					success: false,
-					message: `User ${existingUser.username} is not baned`
+					message: `Only master can remover admin`
 				}
 
-			existingUser.isBan = false
+			if (existingUser.isAdmin && user?.isMaster) {
+				await existingUser.remove()
 
-			await existingUser.save()
+				return {
+					code: 200,
+					success: true,
+					message: `User ${existingUser.username} was remove by ${user.isAdmin ? 'admin' : user.isMaster ? 'master' : ''}`
+				}
+			}
+
+			await existingUser.remove()
 
 			return {
 				code: 200,
-				success: false,
-				message: `Unban user ${existingUser.username} successfully`
+				success: true,
+				message: `User ${existingUser.username} was remove by ${user!.isAdmin ? 'admin' : user!.isMaster ? 'master' : ''}`
 			}
 		} catch (err) {
 			throw internalServerError(err)
